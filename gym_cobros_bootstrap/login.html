@@ -365,11 +365,33 @@
       }
 
       setLoading(true);
-      const { data, error } = await supabase.auth.getSession();
-      setLoading(false);
 
-      if (!error && data?.session) {
-        window.location.href = 'index.html';
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Error al obtener sesión:', sessionError);
+          return;
+        }
+
+        if (!sessionData?.session) {
+          return;
+        }
+
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+
+        if (userError) {
+          console.error('Error al obtener usuario:', userError);
+          return;
+        }
+
+        if (userData?.user) {
+          window.location.href = 'index.html';
+        }
+      } catch (error) {
+        console.error('Error verificando sesión existente:', error);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -399,11 +421,27 @@
           throw new Error('No se pudo crear la sesión.');
         }
 
-        window.location.href = 'index.html';
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 300);
       } catch (error) {
+        console.error('Error al iniciar sesión:', error);
         showAlert(error.message || 'No se pudo iniciar sesión.');
       } finally {
         setLoading(false);
+      }
+    });
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event en login:', event, session);
+
+      if (
+        session &&
+        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')
+      ) {
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 300);
       }
     });
 
