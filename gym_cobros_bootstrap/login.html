@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login • Impacto GYM</title>
+  <meta name="description" content="Acceso al sistema Impacto GYM">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root{
+      --bg-1:#08080b;
+      --bg-2:#111827;
+      --card:#111827cc;
+      --border:rgba(255,255,255,.08);
+      --text:#f8fafc;
+      --muted:#cbd5e1;
+      --danger:#ef4444;
+      --danger-2:#b91c1c;
+      --shadow:0 20px 70px rgba(0,0,0,.45);
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      min-height:100vh;
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(239,68,68,.22), transparent 30%),
+        radial-gradient(circle at top right, rgba(255,255,255,.06), transparent 22%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow-x:hidden;
+      overflow-y:auto;
+    }
+
+    .bg-shape{
+      position:fixed;
+      inset:auto;
+      width:360px;
+      height:360px;
+      border-radius:50%;
+      filter: blur(80px);
+      opacity:.20;
+      pointer-events:none;
+      animation: floatY 7s ease-in-out infinite;
+      z-index:0;
+    }
+
+    .bg-shape.one{
+      top:-80px;
+      left:-60px;
+      background:#ef4444;
+    }
+
+    .bg-shape.two{
+      right:-80px;
+      bottom:-90px;
+      background:#7f1d1d;
+      animation-delay:1s;
+    }
+
+    @keyframes floatY{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(18px)}
+    }
+
+    .login-wrap{
+      position:relative;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:32px 16px;
+      z-index:1;
+    }
+
+    .login-card{
+      width:100%;
+      max-width:470px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:28px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow:hidden;
+      animation: fadeUp .55s ease;
+    }
+
+    @keyframes fadeUp{
+      from{opacity:0; transform:translateY(18px) scale(.98)}
+      to{opacity:1; transform:translateY(0) scale(1)}
+    }
+
+    .logo-box{
+      padding:24px 24px 10px;
+      text-align:center;
+      display:flex;
+      justify-content:center;
+    }
+
+    .logo-box img{
+      width:100%;
+      max-width:280px;
+      aspect-ratio:1 / 1;
+      border-radius:24px;
+      object-fit:contain;
+      background:#0b1220;
+      padding:10px;
+      box-shadow:0 18px 45px rgba(239,68,68,.18);
+    }
+
+    .content-box{
+      padding:18px 24px 28px;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(239,68,68,.12);
+      color:#fecaca;
+      font-size:.85rem;
+      margin-bottom:14px;
+    }
+
+    .title{
+      font-size:2rem;
+      font-weight:800;
+      margin-bottom:6px;
+      letter-spacing:-.02em;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      margin-bottom:22px;
+    }
+
+    .form-label{
+      font-weight:600;
+      margin-bottom:8px;
+    }
+
+    .form-control{
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);
+      color:#fff;
+      border-radius:16px;
+      min-height:54px;
+      padding-left:14px;
+    }
+
+    .form-control::placeholder{
+      color:#94a3b8;
+    }
+
+    .form-control:focus{
+      background:rgba(255,255,255,.06);
+      color:#fff;
+      border-color:rgba(239,68,68,.45);
+      box-shadow:0 0 0 .25rem rgba(239,68,68,.12);
+    }
+
+    .input-group-text{
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);
+      color:#fff;
+      border-radius:16px 0 0 16px;
+    }
+
+    .input-group .form-control{
+      border-left:0;
+      border-radius:0 16px 16px 0;
+    }
+
+    .btn-login{
+      min-height:56px;
+      border:none;
+      border-radius:16px;
+      font-weight:700;
+      font-size:1rem;
+      background:linear-gradient(135deg, #ef4444, #b91c1c);
+      box-shadow:0 14px 28px rgba(185,28,28,.28);
+    }
+
+    .btn-login:hover{
+      background:linear-gradient(135deg, #f05252, #991b1b);
+    }
+
+    .helper-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-top:14px;
+      margin-bottom:18px;
+      color:var(--muted);
+      font-size:.95rem;
+      flex-wrap:wrap;
+    }
+
+    .form-check-input,
+    .form-check-label{
+      cursor:pointer;
+    }
+
+    .mini-note{
+      text-align:center;
+      color:#94a3b8;
+      margin-top:16px;
+      font-size:.92rem;
+    }
+
+    .loading-overlay{
+      position:absolute;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(3,7,18,.55);
+      backdrop-filter: blur(6px);
+      z-index:5;
+    }
+
+    .loading-overlay.show{
+      display:flex;
+    }
+
+    .status-card{
+      background:rgba(15,23,42,.86);
+      border:1px solid rgba(255,255,255,.08);
+      padding:18px 22px;
+      border-radius:18px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      box-shadow:var(--shadow);
+    }
+
+    .alert{
+      border-radius:16px;
+    }
+
+    @media (max-width: 576px){
+      .login-card{
+        max-width:100%;
+        border-radius:22px;
+      }
+
+      .logo-box img{
+        max-width:230px;
+      }
+
+      .title{
+        font-size:1.8rem;
+      }
+
+      .content-box{
+        padding:16px 18px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-shape one"></div>
+  <div class="bg-shape two"></div>
+
+  <div class="login-wrap">
+    <div class="login-card position-relative">
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="status-card">
+          <div class="spinner-border text-danger" role="status"></div>
+          <div>Verificando acceso...</div>
+        </div>
+      </div>
+
+      <div class="logo-box">
+        <img src="assets/logo-impactogym.png" alt="Logo Impacto GYM">
+      </div>
+
+      <div class="content-box">
+        <div class="eyebrow">
+          <i class="bi bi-shield-lock-fill"></i>
+          Acceso seguro
+        </div>
+
+        <div class="title">Bienvenido</div>
+        <div class="subtitle">Ingresa con tu usuario y contraseña para acceder al sistema de cobros.</div>
+
+        <div id="alertBox"></div>
+
+        <form id="loginForm">
+          <div class="mb-3">
+            <label class="form-label" for="email">Correo</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-envelope-fill"></i></span>
+              <input type="email" class="form-control" id="email" placeholder="admin@impactogym.com" required autocomplete="username">
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label" for="password">Contraseña</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+              <input type="password" class="form-control" id="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+          </div>
+
+          <div class="helper-row">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="rememberMe" checked>
+              <label class="form-check-label" for="rememberMe">Recordar sesión</label>
+            </div>
+            <span>Impacto GYM</span>
+          </div>
+
+          <button class="btn btn-danger btn-login w-100" type="submit" id="btnLogin">
+            <i class="bi bi-box-arrow-in-right"></i>
+            Ingresar al sistema
+          </button>
+        </form>
+
+        <div class="mini-note">
+          Sistema web de cuotas y vencimientos
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://jnumbjykyiohxcdoppzr.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_Q9fUtf7Wt39Y4Ij2ihAczw_YhFLh7Wb';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const loginForm = document.getElementById('loginForm');
+    const alertBox = document.getElementById('alertBox');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const btnLogin = document.getElementById('btnLogin');
+
+    function showAlert(message, type = 'danger') {
+      alertBox.innerHTML = `
+        <div class="alert alert-${type} mb-3" role="alert">
+          ${message}
+        </div>
+      `;
+    }
+
+    function clearAlert() {
+      alertBox.innerHTML = '';
+    }
+
+    function setLoading(active) {
+      loadingOverlay.classList.toggle('show', active);
+      btnLogin.disabled = active;
+    }
+
+    async function checkExistingSession() {
+      if (window.location.protocol === 'file:') {
+        showAlert('Abre este sistema con Live Server en VS Code. No uses doble clic sobre el archivo.', 'warning');
+        return;
+      }
+
+      setLoading(true);
+      const { data, error } = await supabase.auth.getSession();
+      setLoading(false);
+
+      if (!error && data?.session) {
+        window.location.href = 'index.html';
+      }
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearAlert();
+
+      if (window.location.protocol === 'file:') {
+        showAlert('Para que el login funcione bien, abre el proyecto con Live Server.', 'warning');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        if (!data?.session) {
+          throw new Error('No se pudo crear la sesión.');
+        }
+
+        window.location.href = 'index.html';
+      } catch (error) {
+        showAlert(error.message || 'No se pudo iniciar sesión.');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    checkExistingSession();
+  </script>
+</body>
+</html>

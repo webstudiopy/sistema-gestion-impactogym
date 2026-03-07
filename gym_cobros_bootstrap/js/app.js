@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://jnumbjykyiohxcdoppzr.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_Q9fUtf7Wt39Y4Ij2ihAczw_YhFLh7Wb';
+const SUPABASE_ANON_KEY = 'sb_publishable_Q9fUtf7Wt39Y4Ij2ihAczw_YhFLh7Wb'
 
 const PLANES = {
   Diario: 10000,
@@ -26,6 +26,17 @@ const state = {
 };
 
 const $$ = (id) => document.getElementById(id);
+
+async function protectPage() {
+  const { data, error } = await state.supabase.auth.getSession();
+
+  if (error || !data?.session) {
+    window.location.href = 'login.html';
+    return false;
+  }
+
+  return true;
+}
 
 function notify(message, isError = false) {
   toastEl.classList.toggle('text-bg-danger', isError);
@@ -366,7 +377,7 @@ $$('formPago').addEventListener('submit', async (e) => {
   try {
     const socioId = $$('pagoSocio').value;
     const fechaPago = $$('pagoFecha').value;
-    const socio = state.socios.find((s) => s.id === socioId);
+    const socio = state.socios.find((s) => String(s.id) === String(socioId));
 
     const payload = {
       socio_id: socioId,
@@ -427,7 +438,9 @@ $$('formMetodo').addEventListener('submit', async (e) => {
     notify(error.message || 'No se pudo guardar el método.', true);
   }
 });
-
+if ($$('btnLogout')) {
+  $$('btnLogout').addEventListener('click', logout);
+}
 $$('btnCancelarEdicion').addEventListener('click', resetMethodForm);
 $$('btnRecargar').addEventListener('click', loadAll);
 $$('btnTheme').addEventListener('click', () => {
@@ -443,8 +456,19 @@ function setDefaults() {
   setPlanDefaults();
 }
 
+async function logout() {
+  await state.supabase.auth.signOut();
+  window.location.href = 'login.html';
+}
+
 wireMoneyInputs();
 setDefaults();
-if (initSupabase()) {
-  loadAll();
-}
+
+(async () => {
+  if (initSupabase()) {
+    const ok = await protectPage();
+    if (ok) {
+      loadAll();
+    }
+  }
+})();
