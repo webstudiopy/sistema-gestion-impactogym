@@ -334,7 +334,15 @@
   <script>
     const SUPABASE_URL = 'https://jnumbjykyiohxcdoppzr.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_Q9fUtf7Wt39Y4Ij2ihAczw_YhFLh7Wb';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'impactogym-auth'
+      }
+    });
 
     const loginForm = document.getElementById('loginForm');
     const alertBox = document.getElementById('alertBox');
@@ -360,32 +368,23 @@
 
     async function checkExistingSession() {
       if (window.location.protocol === 'file:') {
-        showAlert('Abre este sistema con Live Server en VS Code. No uses doble clic sobre el archivo.', 'warning');
+        showAlert('Abre este sistema con localhost o Live Server. No uses doble clic sobre el archivo.', 'warning');
         return;
       }
 
       setLoading(true);
 
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const { data, error } = await sb.auth.getSession();
+        console.log('LOGIN CHECK SESSION:', data);
+        console.log('LOGIN CHECK ERROR:', error);
 
-        if (sessionError) {
-          console.error('Error al obtener sesión:', sessionError);
+        if (error) {
+          console.error('Error al obtener sesión:', error);
           return;
         }
 
-        if (!sessionData?.session) {
-          return;
-        }
-
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-
-        if (userError) {
-          console.error('Error al obtener usuario:', userError);
-          return;
-        }
-
-        if (userData?.user) {
+        if (data?.session) {
           window.location.href = 'index.html';
         }
       } catch (error) {
@@ -400,7 +399,7 @@
       clearAlert();
 
       if (window.location.protocol === 'file:') {
-        showAlert('Para que el login funcione bien, abre el proyecto con Live Server.', 'warning');
+        showAlert('Para que el login funcione bien, abre el proyecto con localhost o Live Server.', 'warning');
         return;
       }
 
@@ -410,20 +409,28 @@
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await sb.auth.signInWithPassword({
           email,
           password,
         });
 
+        console.log('LOGIN DATA:', data);
+        console.log('LOGIN ERROR:', error);
+
         if (error) throw error;
 
-        if (!data?.session) {
-          throw new Error('No se pudo crear la sesión.');
+        const { data: sessionCheck, error: sessionCheckError } = await sb.auth.getSession();
+
+        console.log('POST LOGIN SESSION:', sessionCheck);
+        console.log('POST LOGIN SESSION ERROR:', sessionCheckError);
+
+        if (sessionCheckError) throw sessionCheckError;
+
+        if (!sessionCheck?.session) {
+          throw new Error('Se inició sesión, pero no quedó guardada.');
         }
 
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 300);
+        window.location.href = 'index.html';
       } catch (error) {
         console.error('Error al iniciar sesión:', error);
         showAlert(error.message || 'No se pudo iniciar sesión.');
@@ -432,17 +439,8 @@
       }
     });
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       console.log('Auth event en login:', event, session);
-
-      if (
-        session &&
-        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')
-      ) {
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 300);
-      }
     });
 
     checkExistingSession();

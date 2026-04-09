@@ -14,7 +14,9 @@
   <div class="app-shell">
     <aside class="sidebar d-none d-lg-flex flex-column">
       <div class="brand-block">
-        <div class="brand-logo"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div class="brand-logo">
+  <img src="/assets/logo2.png" alt="Logo Impacto GYM">
+</div>
         <div>
           <h1 class="brand-title mb-0">Imapacto GYM</h1>
           <p class="brand-subtitle mb-0">Cobros diarios, semanales y mensuales</p>
@@ -36,15 +38,10 @@
     <main class="main-content">
       <header class="topbar">
         <div>
-          <div class="eyebrow">Sistema web para gimnasio</div>
-          <h2 class="page-title mb-0">Control profesional de cuotas y vencimientos</h2>
         </div>
         <div class="topbar-actions">
   <button class="btn btn-outline-secondary btn-sm" id="btnTheme">
     <i class="bi bi-moon-stars"></i> Tema
-  </button>
-  <button class="btn btn-primary btn-sm" id="btnRecargar">
-    <i class="bi bi-arrow-clockwise"></i> Recargar
   </button>
   <button class="btn btn-danger btn-sm" id="btnLogout">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -55,7 +52,6 @@
       <section id="panel" class="mb-4">
         <div class="hero-card">
           <div>
-            <span class="hero-badge"><i class="bi bi-stars"></i>GYM</span>
             <h3 class="hero-title">Impacto GYM</h3>
             <p class="hero-text mb-0">Registra pagos por día, semana o mes, controla vencidos y separa ingresos por forma de pago.</p>
           </div>
@@ -271,14 +267,15 @@
             <div class="table-responsive mt-3">
               <table class="table table-modern align-middle" id="tablaSocios">
                 <thead>
-                  <tr>
-                    <th>Socio</th>
-                    <th>Plan</th>
-                    <th class="text-end">Monto</th>
-                    <th>Vencimiento</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
+  <tr>
+    <th>Socio</th>
+    <th>Plan</th>
+    <th class="text-end">Monto</th>
+    <th>Vencimiento</th>
+    <th>Estado</th>
+    <th class="text-center">Acciones</th>
+  </tr>
+</thead>
                 <tbody></tbody>
               </table>
             </div>

@@ -15,11 +15,12 @@ const PLAN_DIAS = {
 
 const toastEl = document.getElementById('appToast');
 const toastMsg = document.getElementById('toastMsg');
-const appToast = new bootstrap.Toast(toastEl);
+const appToast = toastEl ? new bootstrap.Toast(toastEl) : null;
 
 const state = {
   supabase: null,
   editingMethodId: null,
+  editingSocioId: null,
   socios: [],
   metodos: [],
   pagos: [],
@@ -27,54 +28,12 @@ const state = {
 
 const $$ = (id) => document.getElementById(id);
 
-async function protectPage() {
-  try {
-    if (window.location.protocol === 'file:') {
-      window.location.href = 'login.html';
-      return false;
-    }
-
-    const {
-      data: { session },
-      error: sessionError,
-    } = await state.supabase.auth.getSession();
-
-    if (sessionError) {
-      console.error('Error al obtener sesión:', sessionError);
-      window.location.href = 'login.html';
-      return false;
-    }
-
-    if (!session) {
-      window.location.href = 'login.html';
-      return false;
-    }
-
-    const {
-      data: { user },
-      error: userError,
-    } = await state.supabase.auth.getUser();
-
-    if (userError) {
-      console.error('Error al obtener usuario:', userError);
-      window.location.href = 'login.html';
-      return false;
-    }
-
-    if (!user) {
-      window.location.href = 'login.html';
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error en protectPage:', error);
-    window.location.href = 'login.html';
-    return false;
-  }
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function notify(message, isError = false) {
+  if (!toastEl || !toastMsg || !appToast) return;
   toastEl.classList.remove('text-bg-danger', 'text-bg-dark');
   toastEl.classList.add(isError ? 'text-bg-danger' : 'text-bg-dark');
   toastMsg.textContent = message;
@@ -143,7 +102,7 @@ function getEstadoBadge(dateIso) {
     return '<span class="badge rounded-pill badge-soft text-bg-warning">Vence hoy</span>';
   }
 
-  return `<span class="badge rounded-pill badge-overdue">${diff}</span>`;
+  return `<span class="badge rounded-pill badge-overdue">${Math.abs(diff)} día(s) vencido</span>`;
 }
 
 function wireMoneyInputs() {
@@ -156,23 +115,84 @@ function wireMoneyInputs() {
 }
 
 function initSupabase() {
-  if (
-    !SUPABASE_URL ||
-    !SUPABASE_ANON_KEY ||
-    SUPABASE_URL.includes('PEGAR_AQUI') ||
-    SUPABASE_ANON_KEY.includes('PEGAR_AQUI')
-  ) {
-    notify('Edita js/app.js y pega tu URL y anon key de Supabase.', true);
+  state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'impactogym-auth',
+    },
+  });
+
+  console.log('Supabase inicializado en index');
+  return true;
+}
+
+async function protectPage() {
+  try {
+    if (window.location.protocol === 'file:') {
+      window.location.href = 'login.html';
+      return false;
+    }
+
+    let { data, error } = await state.supabase.auth.getSession();
+
+    console.log('INDEX SESSION 1:', data?.session);
+    console.log('INDEX SESSION ERROR 1:', error);
+
+    if (error) {
+      console.error('Error al obtener sesión:', error);
+      window.location.href = 'login.html';
+      return false;
+    }
+
+    if (!data?.session) {
+      await sleep(400);
+
+      const secondTry = await state.supabase.auth.getSession();
+      data = secondTry.data;
+      error = secondTry.error;
+
+      console.log('INDEX SESSION 2:', data?.session);
+      console.log('INDEX SESSION ERROR 2:', error);
+
+      if (error) {
+        console.error('Error al obtener sesión en segundo intento:', error);
+        window.location.href = 'login.html';
+        return false;
+      }
+    }
+
+    if (!data?.session) {
+      window.location.href = 'login.html';
+      return false;
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await state.supabase.auth.getUser();
+
+    console.log('INDEX USER:', user);
+    console.log('INDEX USER ERROR:', userError);
+
+    if (userError || !user) {
+      console.error('Error al obtener usuario:', userError);
+      window.location.href = 'login.html';
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error en protectPage:', error);
+    window.location.href = 'login.html';
     return false;
   }
-
-  state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return true;
 }
 
 function watchAuth() {
   state.supabase.auth.onAuthStateChange((event, session) => {
-    console.log('Auth event:', event, session);
+    console.log('Auth event en index:', event, session);
 
     const eventosQueCierranSesion = [
       'SIGNED_OUT',
@@ -268,7 +288,7 @@ function renderSociosTable() {
 
   if (!state.socios.length) {
     tbody.innerHTML =
-      '<tr><td colspan="5"><div class="empty-state">Todavía no hay socios cargados.</div></td></tr>';
+      '<tr><td colspan="6"><div class="empty-state">Todavía no hay socios cargados.</div></td></tr>';
     updateStats();
     return;
   }
@@ -282,6 +302,26 @@ function renderSociosTable() {
           <td class="text-end fw-bold">${formatGs(s.monto_mensual)}</td>
           <td>${s.proximo_vencimiento || '-'}</td>
           <td>${getEstadoBadge(s.proximo_vencimiento)}</td>
+          <td class="text-center">
+            <div class="socio-actions-inline">
+              <button
+                type="button"
+                class="icon-btn icon-btn-edit"
+                onclick="editSocio('${s.id}')"
+                title="Editar"
+              >
+                <i class="bi bi-pencil-square"></i>
+              </button>
+              <button
+                type="button"
+                class="icon-btn icon-btn-delete"
+                onclick="deleteSocio('${s.id}')"
+                title="Eliminar"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
         </tr>
       `
     )
@@ -289,7 +329,6 @@ function renderSociosTable() {
 
   updateStats();
 }
-
 function renderMetodosSelect() {
   const select = $$('pagoMetodo');
   if (!select) return;
@@ -454,11 +493,87 @@ window.startEditMethod = (id, name, active) => {
   }
 };
 
+window.editSocio = (id) => {
+  const socio = state.socios.find((s) => String(s.id) === String(id));
+  if (!socio) return;
+
+  state.editingSocioId = id;
+
+  $$('socioNombre').value = socio.nombre || '';
+  $$('socioDocumento').value = socio.documento || '';
+  $$('socioTelefono').value = socio.telefono || '';
+  $$('socioPlan').value = socio.plan || 'Mensual';
+  $$('socioMonto').value = formatGsInput(socio.monto_mensual || 0);
+  $$('socioVencimiento').value = socio.proximo_vencimiento || '';
+
+  const submitBtn = document.querySelector('#formSocio button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Actualizar socio';
+  }
+
+  const sociosSection = document.getElementById('socios');
+  if (sociosSection) {
+    window.scrollTo({
+      top: sociosSection.offsetTop - 20,
+      behavior: 'smooth',
+    });
+  }
+};
+
+window.deleteSocio = async (id) => {
+  const socio = state.socios.find((s) => String(s.id) === String(id));
+  if (!socio) return;
+
+  const ok = confirm(`¿Eliminar al socio "${socio.nombre}"?`);
+  if (!ok) return;
+
+  try {
+    const { error } = await state.supabase
+      .from('socios')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    if (state.editingSocioId === id) {
+      resetSocioForm();
+    }
+
+    notify('Socio eliminado correctamente.');
+    await fetchSocios();
+    await fetchPagos();
+  } catch (error) {
+    console.error(error);
+
+    if (String(error.message || '').toLowerCase().includes('foreign key')) {
+      notify('No se puede eliminar este socio porque tiene pagos relacionados.', true);
+      return;
+    }
+
+    notify(error.message || 'No se pudo eliminar el socio.', true);
+  }
+};
+
 function resetMethodForm() {
   state.editingMethodId = null;
   $$('formMetodo').reset();
   $$('metodoActivo').value = 'true';
   $$('btnCancelarEdicion').hidden = true;
+}
+
+function resetSocioForm() {
+  state.editingSocioId = null;
+
+  const formSocio = $$('formSocio');
+  if (formSocio) formSocio.reset();
+
+  if ($$('socioPlan')) $$('socioPlan').value = 'Mensual';
+  setPlanDefaults();
+
+  const submitBtn = document.querySelector('#formSocio button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="bi bi-person-plus-fill"></i> Guardar socio';
+  }
 }
 
 function setPlanDefaults() {
@@ -476,133 +591,155 @@ async function loadAll() {
   }
 }
 
-$$('formSocio').addEventListener('submit', async (e) => {
-  e.preventDefault();
+if ($$('formSocio')) {
+  $$('formSocio').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-  if (!state.supabase) {
-    notify('No se pudo conectar con Supabase.', true);
-    return;
-  }
-
-  try {
-    const payload = {
-      nombre: $$('socioNombre').value.trim(),
-      documento: $$('socioDocumento').value.trim() || null,
-      telefono: $$('socioTelefono').value.trim() || null,
-      plan: $$('socioPlan').value,
-      monto_mensual: parseGs($$('socioMonto').value),
-      proximo_vencimiento: $$('socioVencimiento').value,
-      activo: true,
-    };
-
-    const { error } = await state.supabase.from('socios').insert(payload);
-    if (error) throw error;
-
-    e.target.reset();
-    setPlanDefaults();
-    notify('Socio guardado correctamente.');
-    await fetchSocios();
-  } catch (error) {
-    console.error(error);
-    notify(error.message || 'No se pudo guardar el socio.', true);
-  }
-});
-
-$$('pagoSocio').addEventListener('change', () => {
-  const selected = $$('pagoSocio').selectedOptions[0];
-  if (!selected) return;
-
-  const monto = Number(selected.dataset.monto || 0);
-  if (monto) {
-    $$('pagoMonto').value = formatGsInput(monto);
-  }
-});
-
-$$('socioPlan').addEventListener('change', setPlanDefaults);
-
-$$('formPago').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  if (!state.supabase) {
-    notify('No se pudo conectar con Supabase.', true);
-    return;
-  }
-
-  try {
-    const socioId = $$('pagoSocio').value;
-    const fechaPago = $$('pagoFecha').value;
-    const socio = state.socios.find((s) => String(s.id) === String(socioId));
-
-    const payload = {
-      socio_id: socioId,
-      forma_pago_id: $$('pagoMetodo').value,
-      monto: parseGs($$('pagoMonto').value),
-      periodo: $$('pagoPeriodo').value,
-      fecha_pago: fechaPago,
-      observacion: $$('pagoObservacion').value.trim() || null,
-    };
-
-    const { error } = await state.supabase.from('pagos').insert(payload);
-    if (error) throw error;
-
-    if (socio) {
-      const nuevoVencimiento = addDays(fechaPago, PLAN_DIAS[socio.plan] || 30);
-
-      const updateRes = await state.supabase
-        .from('socios')
-        .update({ proximo_vencimiento: nuevoVencimiento })
-        .eq('id', socio.id);
-
-      if (updateRes.error) throw updateRes.error;
+    if (!state.supabase) {
+      notify('No se pudo conectar con Supabase.', true);
+      return;
     }
 
-    e.target.reset();
-    $$('pagoFecha').value = todayISO();
-    $$('pagoPeriodo').value = currentMonth();
-    notify('Pago registrado correctamente.');
-    await loadAll();
-  } catch (error) {
-    console.error(error);
-    notify(error.message || 'No se pudo registrar el pago.', true);
-  }
-});
+    try {
+      const payload = {
+        nombre: $$('socioNombre').value.trim(),
+        documento: $$('socioDocumento').value.trim() || null,
+        telefono: $$('socioTelefono').value.trim() || null,
+        plan: $$('socioPlan').value,
+        monto_mensual: parseGs($$('socioMonto').value),
+        proximo_vencimiento: $$('socioVencimiento').value,
+        activo: true,
+      };
 
-$$('formMetodo').addEventListener('submit', async (e) => {
-  e.preventDefault();
+      let result;
 
-  if (!state.supabase) {
-    notify('No se pudo conectar con Supabase.', true);
-    return;
-  }
+      if (state.editingSocioId) {
+        result = await state.supabase
+          .from('socios')
+          .update(payload)
+          .eq('id', state.editingSocioId);
+      } else {
+        result = await state.supabase
+          .from('socios')
+          .insert(payload);
+      }
 
-  try {
-    const payload = {
-      nombre: $$('metodoNombre').value.trim(),
-      activo: $$('metodoActivo').value === 'true',
-    };
+      if (result.error) throw result.error;
 
-    let result;
-    const isEditing = Boolean(state.editingMethodId);
+      resetSocioForm();
+      notify(state.editingSocioId ? 'Socio actualizado correctamente.' : 'Socio guardado correctamente.');
+      await fetchSocios();
+      await fetchPagos();
+    } catch (error) {
+      console.error(error);
+      notify(error.message || 'No se pudo guardar el socio.', true);
+    }
+  });
+}
 
-    if (isEditing) {
-      result = await state.supabase
-        .from('formas_pago')
-        .update(payload)
-        .eq('id', state.editingMethodId);
-    } else {
-      result = await state.supabase.from('formas_pago').insert(payload);
+if ($$('pagoSocio')) {
+  $$('pagoSocio').addEventListener('change', () => {
+    const selected = $$('pagoSocio').selectedOptions[0];
+    if (!selected) return;
+
+    const monto = Number(selected.dataset.monto || 0);
+    if (monto) {
+      $$('pagoMonto').value = formatGsInput(monto);
+    }
+  });
+}
+
+if ($$('socioPlan')) {
+  $$('socioPlan').addEventListener('change', setPlanDefaults);
+}
+
+if ($$('formPago')) {
+  $$('formPago').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!state.supabase) {
+      notify('No se pudo conectar con Supabase.', true);
+      return;
     }
 
-    if (result.error) throw result.error;
+    try {
+      const socioId = $$('pagoSocio').value;
+      const fechaPago = $$('pagoFecha').value;
+      const socio = state.socios.find((s) => String(s.id) === String(socioId));
 
-    resetMethodForm();
-    notify(isEditing ? 'Método actualizado.' : 'Método guardado.');
-    await fetchMetodos();
-  } catch (error) {
-    console.error(error);
-    notify(error.message || 'No se pudo guardar el método.', true);
-  }
-});
+      const payload = {
+        socio_id: socioId,
+        forma_pago_id: $$('pagoMetodo').value,
+        monto: parseGs($$('pagoMonto').value),
+        periodo: $$('pagoPeriodo').value,
+        fecha_pago: fechaPago,
+        observacion: $$('pagoObservacion').value.trim() || null,
+      };
+
+      const { error } = await state.supabase.from('pagos').insert(payload);
+      if (error) throw error;
+
+      if (socio) {
+        const nuevoVencimiento = addDays(fechaPago, PLAN_DIAS[socio.plan] || 30);
+
+        const updateRes = await state.supabase
+          .from('socios')
+          .update({ proximo_vencimiento: nuevoVencimiento })
+          .eq('id', socio.id);
+
+        if (updateRes.error) throw updateRes.error;
+      }
+
+      e.target.reset();
+      $$('pagoFecha').value = todayISO();
+      $$('pagoPeriodo').value = currentMonth();
+      notify('Pago registrado correctamente.');
+      await loadAll();
+    } catch (error) {
+      console.error(error);
+      notify(error.message || 'No se pudo registrar el pago.', true);
+    }
+  });
+}
+
+if ($$('formMetodo')) {
+  $$('formMetodo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!state.supabase) {
+      notify('No se pudo conectar con Supabase.', true);
+      return;
+    }
+
+    try {
+      const payload = {
+        nombre: $$('metodoNombre').value.trim(),
+        activo: $$('metodoActivo').value === 'true',
+      };
+
+      let result;
+      const isEditing = Boolean(state.editingMethodId);
+
+      if (isEditing) {
+        result = await state.supabase
+          .from('formas_pago')
+          .update(payload)
+          .eq('id', state.editingMethodId);
+      } else {
+        result = await state.supabase.from('formas_pago').insert(payload);
+      }
+
+      if (result.error) throw result.error;
+
+      resetMethodForm();
+      notify(isEditing ? 'Método actualizado.' : 'Método guardado.');
+      await fetchMetodos();
+    } catch (error) {
+      console.error(error);
+      notify(error.message || 'No se pudo guardar el método.', true);
+    }
+  });
+}
 
 if ($$('btnLogout')) {
   $$('btnLogout').addEventListener('click', logout);
@@ -623,12 +760,23 @@ if ($$('btnTheme')) {
   });
 }
 
+if ($$('formSocio')) {
+  const resetBtnSocio = document.querySelector('#formSocio button[type="reset"]');
+  if (resetBtnSocio) {
+    resetBtnSocio.addEventListener('click', () => {
+      setTimeout(() => {
+        resetSocioForm();
+      }, 0);
+    });
+  }
+}
+
 function setDefaults() {
   if ($$('pagoFecha')) $$('pagoFecha').value = todayISO();
   if ($$('pagoPeriodo')) $$('pagoPeriodo').value = currentMonth();
   if ($$('metodoActivo')) $$('metodoActivo').value = 'true';
   if ($$('socioPlan')) $$('socioPlan').value = 'Mensual';
-  setPlanDefaults();
+  if ($$('socioPlan')) setPlanDefaults();
 }
 
 async function logout() {
