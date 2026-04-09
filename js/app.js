@@ -17,9 +17,15 @@ const toastEl = document.getElementById('appToast');
 const toastMsg = document.getElementById('toastMsg');
 const appToast = toastEl ? new bootstrap.Toast(toastEl) : null;
 
+const modalConfirmarSalirEl = document.getElementById('modalConfirmarSalir');
+const modalSociosVencidosEl = document.getElementById('modalSociosVencidos');
+
+const modalConfirmarSalir = modalConfirmarSalirEl
+  ? new bootstrap.Modal(modalConfirmarSalirEl)
+  : null;
+
 const state = {
   supabase: null,
-  editingMethodId: null,
   editingSocioId: null,
   socios: [],
   metodos: [],
@@ -221,6 +227,7 @@ async function fetchSocios() {
   state.socios = data || [];
   renderSociosSelect();
   renderSociosTable();
+  renderSociosVencidosModal();
 }
 
 async function fetchMetodos() {
@@ -329,6 +336,7 @@ function renderSociosTable() {
 
   updateStats();
 }
+
 function renderMetodosSelect() {
   const select = $$('pagoMetodo');
   if (!select) return;
@@ -369,12 +377,6 @@ function renderMetodos() {
             <span class="badge ${m.activo ? 'text-bg-success' : 'text-bg-secondary'} badge-soft">
               ${m.activo ? 'Activo' : 'Inactivo'}
             </span>
-            <button
-              class="btn btn-outline-primary btn-sm"
-              onclick="startEditMethod('${m.id}', ${JSON.stringify(m.nombre)}, ${m.activo})"
-            >
-              <i class="bi bi-pencil-square"></i>
-            </button>
           </div>
         </div>
       `
@@ -446,6 +448,39 @@ function renderReporteMetodos() {
     .join('');
 }
 
+function renderSociosVencidosModal() {
+  const tbody = $$('tbodySociosVencidos');
+  if (!tbody) return;
+
+  const vencidos = state.socios.filter(
+    (s) => s.proximo_vencimiento && calcDaysFromToday(s.proximo_vencimiento) < 0
+  );
+
+  if (!vencidos.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-secondary py-4">No hay socios vencidos.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = vencidos
+    .map(
+      (s) => `
+        <tr>
+          <td class="fw-semibold">${escapeHtml(s.nombre || '-')}</td>
+          <td>${escapeHtml(s.plan || '-')}</td>
+          <td class="text-end fw-bold">${formatGs(s.monto_mensual || 0)}</td>
+          <td>${escapeHtml(s.proximo_vencimiento || '-')}</td>
+          <td>${escapeHtml(s.telefono || '-')}</td>
+          <td><span class="badge text-bg-danger">Vencido</span></td>
+        </tr>
+      `
+    )
+    .join('');
+}
+
 function updateStats() {
   const statSocios = $$('statSocios');
   const statIngresos = $$('statIngresos');
@@ -477,21 +512,6 @@ function updateStats() {
   if (kpiPagosMes) kpiPagosMes.textContent = pagosMes;
   if (kpiTotalMes) kpiTotalMes.textContent = formatGs(totalMes);
 }
-
-window.startEditMethod = (id, name, active) => {
-  state.editingMethodId = id;
-  $$('metodoNombre').value = name;
-  $$('metodoActivo').value = String(active);
-  $$('btnCancelarEdicion').hidden = false;
-
-  const metodosSection = document.getElementById('metodos');
-  if (metodosSection) {
-    window.scrollTo({
-      top: metodosSection.offsetTop - 20,
-      behavior: 'smooth',
-    });
-  }
-};
 
 window.editSocio = (id) => {
   const socio = state.socios.find((s) => String(s.id) === String(id));
@@ -554,13 +574,6 @@ window.deleteSocio = async (id) => {
   }
 };
 
-function resetMethodForm() {
-  state.editingMethodId = null;
-  $$('formMetodo').reset();
-  $$('metodoActivo').value = 'true';
-  $$('btnCancelarEdicion').hidden = true;
-}
-
 function resetSocioForm() {
   state.editingSocioId = null;
 
@@ -577,9 +590,15 @@ function resetSocioForm() {
 }
 
 function setPlanDefaults() {
-  const plan = $$('socioPlan').value;
-  $$('socioMonto').value = formatGsInput(PLANES[plan] || 0);
-  $$('socioVencimiento').value = addDays(todayISO(), PLAN_DIAS[plan] || 30);
+  const planEl = $$('socioPlan');
+  const montoEl = $$('socioMonto');
+  const vencEl = $$('socioVencimiento');
+
+  if (!planEl || !montoEl || !vencEl) return;
+
+  const plan = planEl.value;
+  montoEl.value = formatGsInput(PLANES[plan] || 0);
+  vencEl.value = addDays(todayISO(), PLAN_DIAS[plan] || 30);
 }
 
 async function loadAll() {
@@ -591,6 +610,29 @@ async function loadAll() {
   }
 }
 
+function toggleTheme() {
+  const html = document.documentElement;
+  html.dataset.bsTheme = html.dataset.bsTheme === 'dark' ? 'light' : 'dark';
+}
+
+function openLogoutModal() {
+  if (modalConfirmarSalir) {
+    modalConfirmarSalir.show();
+    return;
+  }
+  logout();
+}
+
+async function logout() {
+  try {
+    await state.supabase.auth.signOut();
+  } catch (error) {
+    console.error('Error al cerrar sesión:', error);
+  } finally {
+    window.location.href = 'login.html';
+  }
+}
+
 if ($$('formSocio')) {
   $$('formSocio').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -599,6 +641,8 @@ if ($$('formSocio')) {
       notify('No se pudo conectar con Supabase.', true);
       return;
     }
+
+    const isEditing = Boolean(state.editingSocioId);
 
     try {
       const payload = {
@@ -613,7 +657,7 @@ if ($$('formSocio')) {
 
       let result;
 
-      if (state.editingSocioId) {
+      if (isEditing) {
         result = await state.supabase
           .from('socios')
           .update(payload)
@@ -627,7 +671,7 @@ if ($$('formSocio')) {
       if (result.error) throw result.error;
 
       resetSocioForm();
-      notify(state.editingSocioId ? 'Socio actualizado correctamente.' : 'Socio guardado correctamente.');
+      notify(isEditing ? 'Socio actualizado correctamente.' : 'Socio guardado correctamente.');
       await fetchSocios();
       await fetchPagos();
     } catch (error) {
@@ -643,7 +687,7 @@ if ($$('pagoSocio')) {
     if (!selected) return;
 
     const monto = Number(selected.dataset.monto || 0);
-    if (monto) {
+    if (monto && $$('pagoMonto')) {
       $$('pagoMonto').value = formatGsInput(monto);
     }
   });
@@ -691,8 +735,8 @@ if ($$('formPago')) {
       }
 
       e.target.reset();
-      $$('pagoFecha').value = todayISO();
-      $$('pagoPeriodo').value = currentMonth();
+      if ($$('pagoFecha')) $$('pagoFecha').value = todayISO();
+      if ($$('pagoPeriodo')) $$('pagoPeriodo').value = currentMonth();
       notify('Pago registrado correctamente.');
       await loadAll();
     } catch (error) {
@@ -702,62 +746,28 @@ if ($$('formPago')) {
   });
 }
 
-if ($$('formMetodo')) {
-  $$('formMetodo').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    if (!state.supabase) {
-      notify('No se pudo conectar con Supabase.', true);
-      return;
-    }
-
-    try {
-      const payload = {
-        nombre: $$('metodoNombre').value.trim(),
-        activo: $$('metodoActivo').value === 'true',
-      };
-
-      let result;
-      const isEditing = Boolean(state.editingMethodId);
-
-      if (isEditing) {
-        result = await state.supabase
-          .from('formas_pago')
-          .update(payload)
-          .eq('id', state.editingMethodId);
-      } else {
-        result = await state.supabase.from('formas_pago').insert(payload);
-      }
-
-      if (result.error) throw result.error;
-
-      resetMethodForm();
-      notify(isEditing ? 'Método actualizado.' : 'Método guardado.');
-      await fetchMetodos();
-    } catch (error) {
-      console.error(error);
-      notify(error.message || 'No se pudo guardar el método.', true);
-    }
-  });
-}
-
 if ($$('btnLogout')) {
-  $$('btnLogout').addEventListener('click', logout);
+  $$('btnLogout').addEventListener('click', openLogoutModal);
 }
 
-if ($$('btnCancelarEdicion')) {
-  $$('btnCancelarEdicion').addEventListener('click', resetMethodForm);
+if ($$('btnLogoutMobile')) {
+  $$('btnLogoutMobile').addEventListener('click', openLogoutModal);
 }
 
-if ($$('btnRecargar')) {
-  $$('btnRecargar').addEventListener('click', loadAll);
+if ($$('btnConfirmarSalir')) {
+  $$('btnConfirmarSalir').addEventListener('click', logout);
 }
 
 if ($$('btnTheme')) {
-  $$('btnTheme').addEventListener('click', () => {
-    const html = document.documentElement;
-    html.dataset.bsTheme = html.dataset.bsTheme === 'dark' ? 'light' : 'dark';
-  });
+  $$('btnTheme').addEventListener('click', toggleTheme);
+}
+
+if ($$('btnThemeMobile')) {
+  $$('btnThemeMobile').addEventListener('click', toggleTheme);
+}
+
+if (modalSociosVencidosEl) {
+  modalSociosVencidosEl.addEventListener('show.bs.modal', renderSociosVencidosModal);
 }
 
 if ($$('formSocio')) {
@@ -774,19 +784,8 @@ if ($$('formSocio')) {
 function setDefaults() {
   if ($$('pagoFecha')) $$('pagoFecha').value = todayISO();
   if ($$('pagoPeriodo')) $$('pagoPeriodo').value = currentMonth();
-  if ($$('metodoActivo')) $$('metodoActivo').value = 'true';
   if ($$('socioPlan')) $$('socioPlan').value = 'Mensual';
   if ($$('socioPlan')) setPlanDefaults();
-}
-
-async function logout() {
-  try {
-    await state.supabase.auth.signOut();
-  } catch (error) {
-    console.error('Error al cerrar sesión:', error);
-  } finally {
-    window.location.href = 'login.html';
-  }
 }
 
 wireMoneyInputs();
