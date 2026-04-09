@@ -813,3 +813,10 @@ body {
 .modal-footer {
   border-color: rgba(15, 23, 42, 0.08);
 }
+
+#btnDescargarPDFMobile {
+  min-width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 12px;
+}

@@ -12,28 +12,33 @@
 </head>
 <body>
   <header class="mobile-topbar d-lg-none">
-    <button
-      class="btn btn-dark mobile-menu-btn"
-      type="button"
-      data-bs-toggle="offcanvas"
-      data-bs-target="#mobileMenu"
-      aria-controls="mobileMenu"
-    >
-      <i class="bi bi-list"></i>
-    </button>
+  <button
+    class="btn btn-dark mobile-menu-btn"
+    type="button"
+    data-bs-toggle="offcanvas"
+    data-bs-target="#mobileMenu"
+    aria-controls="mobileMenu"
+  >
+    <i class="bi bi-list"></i>
+  </button>
 
-    <div class="mobile-brand">
-      <img src="assets/logo2.png" alt="Logo Impacto GYM">
-      <div>
-        <h1 class="mobile-brand-title mb-0">Impacto GYM</h1>
-        <p class="mobile-brand-subtitle mb-0">Cobros de gimnasio</p>
-      </div>
+  <div class="mobile-brand">
+    <img src="assets/logo2.png" alt="Logo Impacto GYM">
+    <div>
+      <h1 class="mobile-brand-title mb-0">Impacto GYM</h1>
+      <p class="mobile-brand-subtitle mb-0">Cobros de gimnasio</p>
     </div>
+  </div>
 
-    <button class="btn btn-outline-secondary btn-sm" id="btnThemeMobile" type="button">
+  <div class="d-flex align-items-center gap-2">
+    <button class="btn btn-dark btn-sm" id="btnDescargarPDFMobile" type="button" title="Descargar PDF">
+      <i class="bi bi-file-earmark-pdf"></i>
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" id="btnThemeMobile" type="button" title="Cambiar tema">
       <i class="bi bi-moon-stars"></i>
     </button>
-  </header>
+  </div>
+</header>
 
   <div class="offcanvas offcanvas-start mobile-offcanvas" tabindex="-1" id="mobileMenu" aria-labelledby="mobileMenuLabel">
     <div class="offcanvas-header">

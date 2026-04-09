@@ -1086,6 +1086,10 @@ if ($$('btnDescargarPDF')) {
   $$('btnDescargarPDF').addEventListener('click', descargarReportePDF);
 }
 
+if ($$('btnDescargarPDFMobile')) {
+  $$('btnDescargarPDFMobile').addEventListener('click', descargarReportePDF);
+}
+
 if (modalSociosVencidosEl) {
   modalSociosVencidosEl.addEventListener('show.bs.modal', renderSociosVencidosModal);
 }
