@@ -633,6 +633,322 @@ async function logout() {
   }
 }
 
+function formatFechaLarga(fechaIso) {
+  if (!fechaIso) return '-';
+  const fecha = new Date(`${fechaIso}T00:00:00`);
+  return fecha.toLocaleDateString('es-PY', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function obtenerSociosVencidos() {
+  return state.socios.filter(
+    (s) => s.proximo_vencimiento && calcDaysFromToday(s.proximo_vencimiento) < 0
+  );
+}
+
+function obtenerPagosMesActual() {
+  return state.pagos.filter((p) => String(p.periodo).startsWith(currentMonth()));
+}
+
+async function descargarReportePDF() {
+  try {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      notify('No se pudo cargar la librería PDF.', true);
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+
+    const sociosActivos = state.socios.length;
+    const pagosMes = obtenerPagosMesActual();
+    const sociosVencidos = obtenerSociosVencidos();
+    const totalMes = pagosMes.reduce((acc, p) => acc + Number(p.monto || 0), 0);
+
+    const reporteMetodos = new Map();
+    pagosMes.forEach((p) => {
+      const nombreMetodo = p.formas_pago?.nombre || 'Sin método';
+      const actual = reporteMetodos.get(nombreMetodo) || { cantidad: 0, total: 0 };
+      actual.cantidad += 1;
+      actual.total += Number(p.monto || 0);
+      reporteMetodos.set(nombreMetodo, actual);
+    });
+
+    const fechaEmision = new Date().toLocaleDateString('es-PY', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+
+    const colores = {
+      azulMuyClaro: [235, 243, 255],
+      azulSuave: [215, 228, 250],
+      azulTexto: [44, 62, 92],
+      grisFondo: [248, 250, 252],
+      grisCard: [243, 246, 249],
+      grisLinea: [220, 226, 235],
+      grisTexto: [90, 104, 124],
+      verdeSuave: [222, 245, 232],
+      verdeTexto: [47, 111, 74],
+      rojoSuave: [252, 229, 232],
+      rojoTexto: [166, 63, 80],
+      celesteSuave: [229, 243, 250],
+      oscuro: [32, 46, 66],
+    };
+
+    doc.setFillColor(...colores.azulMuyClaro);
+    doc.roundedRect(12, 10, 186, 28, 8, 8, 'F');
+
+    doc.setDrawColor(...colores.azulSuave);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(12, 10, 186, 28, 8, 8);
+
+    doc.setTextColor(...colores.azulTexto);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('Impacto GYM', 18, 22);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...colores.grisTexto);
+    doc.text('Reporte general de cobros', 18, 28);
+    doc.text(`Fecha de emisión: ${fechaEmision}`, 190, 21, { align: 'right' });
+    doc.text(`Periodo: ${currentMonth()}`, 190, 27, { align: 'right' });
+
+    const cards = [
+      { x: 12, titulo: 'SOCIOS ACTIVOS', valor: String(sociosActivos) },
+      { x: 76, titulo: 'PAGOS DEL MES', valor: String(pagosMes.length) },
+      { x: 140, titulo: 'TOTAL COBRADO', valor: formatGs(totalMes) },
+    ];
+
+    cards.forEach((card) => {
+      doc.setFillColor(...colores.grisCard);
+      doc.roundedRect(card.x, 46, 58, 24, 6, 6, 'F');
+      doc.setDrawColor(...colores.grisLinea);
+      doc.roundedRect(card.x, 46, 58, 24, 6, 6);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...colores.grisTexto);
+      doc.text(card.titulo, card.x + 4, 54);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(...colores.oscuro);
+      doc.text(card.valor, card.x + 4, 64);
+    });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...colores.oscuro);
+    doc.text('Resumen por forma de pago', 14, 82);
+
+    const resumenMetodosBody = [...reporteMetodos.entries()].map(([nombre, data]) => [
+      nombre,
+      String(data.cantidad),
+      formatGs(data.total),
+    ]);
+
+    doc.autoTable({
+      startY: 86,
+      head: [['Método', 'Cantidad', 'Total']],
+      body: resumenMetodosBody.length
+        ? resumenMetodosBody
+        : [['Sin datos', '-', '-']],
+      theme: 'grid',
+      headStyles: {
+        fillColor: colores.celesteSuave,
+        textColor: colores.azulTexto,
+        fontStyle: 'bold',
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      bodyStyles: {
+        textColor: colores.oscuro,
+        fillColor: [255, 255, 255],
+      },
+      alternateRowStyles: {
+        fillColor: [250, 252, 255],
+      },
+      styles: {
+        fontSize: 9.5,
+        cellPadding: 3.2,
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      columnStyles: {
+        1: { halign: 'center' },
+        2: { halign: 'right' },
+      },
+    });
+
+    let nextY = doc.lastAutoTable.finalY + 10;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...colores.oscuro);
+    doc.text('Socios vencidos', 14, nextY);
+
+    const vencidosBody = sociosVencidos.map((s) => [
+      s.nombre || '-',
+      s.plan || '-',
+      formatGs(s.monto_mensual || 0),
+      formatFechaLarga(s.proximo_vencimiento),
+      s.telefono || '-',
+    ]);
+
+    doc.autoTable({
+      startY: nextY + 4,
+      head: [['Socio', 'Plan', 'Monto', 'Vencimiento', 'Teléfono']],
+      body: vencidosBody.length
+        ? vencidosBody
+        : [['No hay socios vencidos', '-', '-', '-', '-']],
+      theme: 'grid',
+      headStyles: {
+        fillColor: colores.rojoSuave,
+        textColor: colores.rojoTexto,
+        fontStyle: 'bold',
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      bodyStyles: {
+        textColor: colores.oscuro,
+        fillColor: [255, 255, 255],
+      },
+      alternateRowStyles: {
+        fillColor: [255, 250, 251],
+      },
+      styles: {
+        fontSize: 9.2,
+        cellPadding: 3.2,
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      columnStyles: {
+        2: { halign: 'right' },
+      },
+    });
+
+    nextY = doc.lastAutoTable.finalY + 10;
+
+    if (nextY > 240) {
+      doc.addPage();
+      nextY = 18;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...colores.oscuro);
+    doc.text('Últimos pagos registrados', 14, nextY);
+
+    const pagosBody = state.pagos.slice(0, 15).map((p) => [
+      formatFechaLarga(p.fecha_pago),
+      p.socios?.nombre || '-',
+      p.periodo || '-',
+      p.formas_pago?.nombre || '-',
+      formatGs(p.monto || 0),
+    ]);
+
+    doc.autoTable({
+      startY: nextY + 4,
+      head: [['Fecha', 'Socio', 'Periodo', 'Método', 'Monto']],
+      body: pagosBody.length
+        ? pagosBody
+        : [['Sin pagos', '-', '-', '-', '-']],
+      theme: 'grid',
+      headStyles: {
+        fillColor: colores.verdeSuave,
+        textColor: colores.verdeTexto,
+        fontStyle: 'bold',
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      bodyStyles: {
+        textColor: colores.oscuro,
+        fillColor: [255, 255, 255],
+      },
+      alternateRowStyles: {
+        fillColor: [249, 253, 250],
+      },
+      styles: {
+        fontSize: 9.2,
+        cellPadding: 3.2,
+        lineColor: colores.grisLinea,
+        lineWidth: 0.2,
+      },
+      columnStyles: {
+        4: { halign: 'right' },
+      },
+    });
+
+    const totalPaginas = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPaginas; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(...colores.grisLinea);
+      doc.line(14, 286, 196, 286);
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(...colores.grisTexto);
+      doc.text(
+        `Impacto GYM • Reporte generado automáticamente`,
+        14,
+        290
+      );
+      doc.text(
+        `Página ${i} de ${totalPaginas}`,
+        196,
+        290,
+        { align: 'right' }
+      );
+    }
+
+    doc.save(`impacto-gym-reporte-${currentMonth()}.pdf`);
+    notify('PDF generado correctamente.');
+  } catch (error) {
+    console.error(error);
+    notify('No se pudo generar el PDF.', true);
+  }
+}
+
+function setupMenuLinks() {
+  const allLinks = document.querySelectorAll('.nav-link[data-target]');
+
+  allLinks.forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      const targetId = link.getAttribute('data-target');
+      const section = document.getElementById(targetId);
+      if (!section) return;
+
+      const mobileMenu = document.getElementById('mobileMenu');
+      const offcanvasVisible = mobileMenu && mobileMenu.classList.contains('show');
+
+      if (offcanvasVisible) {
+        const offcanvasInstance = bootstrap.Offcanvas.getOrCreateInstance(mobileMenu);
+        offcanvasInstance.hide();
+
+        setTimeout(() => {
+          const top = section.getBoundingClientRect().top + window.scrollY - 16;
+          window.scrollTo({
+            top,
+            behavior: 'smooth',
+          });
+        }, 250);
+      } else {
+        const top = section.getBoundingClientRect().top + window.scrollY - 16;
+        window.scrollTo({
+          top,
+          behavior: 'smooth',
+        });
+      }
+    });
+  });
+}
+
 if ($$('formSocio')) {
   $$('formSocio').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -766,6 +1082,10 @@ if ($$('btnThemeMobile')) {
   $$('btnThemeMobile').addEventListener('click', toggleTheme);
 }
 
+if ($$('btnDescargarPDF')) {
+  $$('btnDescargarPDF').addEventListener('click', descargarReportePDF);
+}
+
 if (modalSociosVencidosEl) {
   modalSociosVencidosEl.addEventListener('show.bs.modal', renderSociosVencidosModal);
 }
@@ -797,6 +1117,7 @@ setDefaults();
     if (ok) {
       watchAuth();
       await loadAll();
+      setupMenuLinks();
     }
   }
 })();
