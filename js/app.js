@@ -30,6 +30,7 @@ const state = {
   socios: [],
   metodos: [],
   pagos: [],
+  filtroSocio: '',
 };
 
 const $$ = (id) => document.getElementById(id);
@@ -216,6 +217,18 @@ function watchAuth() {
   });
 }
 
+function getSociosFiltrados() {
+  const filtro = String(state.filtroSocio || '').trim().toLowerCase();
+
+  if (!filtro) return [...state.socios];
+
+  return state.socios.filter((s) => {
+    const nombre = String(s.nombre || '').toLowerCase();
+    const documento = String(s.documento || '').toLowerCase();
+    return nombre.includes(filtro) || documento.includes(filtro);
+  });
+}
+
 async function fetchSocios() {
   const { data, error } = await state.supabase
     .from('socios')
@@ -282,7 +295,7 @@ function renderSociosSelect() {
       .map(
         (s) => `
           <option value="${s.id}" data-monto="${s.monto_mensual || 0}" data-plan="${escapeHtml(s.plan || 'Mensual')}">
-            ${escapeHtml(s.nombre)}
+            ${escapeHtml(s.nombre)}${s.documento ? ` • CI: ${escapeHtml(s.documento)}` : ''}
           </option>
         `
       )
@@ -293,17 +306,27 @@ function renderSociosTable() {
   const tbody = document.querySelector('#tablaSocios tbody');
   if (!tbody) return;
 
+  const sociosFiltrados = getSociosFiltrados();
+
   if (!state.socios.length) {
     tbody.innerHTML =
-      '<tr><td colspan="6"><div class="empty-state">Todavía no hay socios cargados.</div></td></tr>';
+      '<tr><td colspan="7"><div class="empty-state">Todavía no hay socios cargados.</div></td></tr>';
     updateStats();
     return;
   }
 
-  tbody.innerHTML = state.socios
+  if (!sociosFiltrados.length) {
+    tbody.innerHTML =
+      '<tr><td colspan="7"><div class="empty-state">No se encontraron socios con ese nombre o CI.</div></td></tr>';
+    updateStats();
+    return;
+  }
+
+  tbody.innerHTML = sociosFiltrados
     .map(
       (s) => `
         <tr>
+          <td class="fw-semibold">${escapeHtml(s.documento || '-')}</td>
           <td class="fw-semibold">${escapeHtml(s.nombre)}</td>
           <td>${escapeHtml(s.plan || '-')}</td>
           <td class="text-end fw-bold">${formatGs(s.monto_mensual)}</td>
@@ -459,7 +482,7 @@ function renderSociosVencidosModal() {
   if (!vencidos.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="text-center text-secondary py-4">No hay socios vencidos.</td>
+        <td colspan="7" class="text-center text-secondary py-4">No hay socios vencidos.</td>
       </tr>
     `;
     return;
@@ -469,6 +492,7 @@ function renderSociosVencidosModal() {
     .map(
       (s) => `
         <tr>
+          <td class="fw-semibold">${escapeHtml(s.documento || '-')}</td>
           <td class="fw-semibold">${escapeHtml(s.nombre || '-')}</td>
           <td>${escapeHtml(s.plan || '-')}</td>
           <td class="text-end fw-bold">${formatGs(s.monto_mensual || 0)}</td>
@@ -484,6 +508,7 @@ function renderSociosVencidosModal() {
 function updateStats() {
   const statSocios = $$('statSocios');
   const statIngresos = $$('statIngresos');
+  const statPagosHoy = $$('statPagosHoy');
   const statVencidos = $$('statVencidos');
   const statMetodos = $$('statMetodos');
   const kpiSocios = $$('kpiSocios');
@@ -498,6 +523,10 @@ function updateStats() {
     String(p.periodo).startsWith(currentMonth())
   ).length;
 
+  const pagosHoy = state.pagos
+    .filter((p) => String(p.fecha_pago || '') === todayISO())
+    .reduce((acc, p) => acc + Number(p.monto || 0), 0);
+
   const vencidos = state.socios.filter(
     (s) => s.proximo_vencimiento && calcDaysFromToday(s.proximo_vencimiento) < 0
   ).length;
@@ -506,6 +535,7 @@ function updateStats() {
 
   if (statSocios) statSocios.textContent = state.socios.length;
   if (statIngresos) statIngresos.textContent = formatGs(totalMes);
+  if (statPagosHoy) statPagosHoy.textContent = formatGs(pagosHoy);
   if (statVencidos) statVencidos.textContent = vencidos;
   if (statMetodos) statMetodos.textContent = metodosActivos;
   if (kpiSocios) kpiSocios.textContent = state.socios.length;
@@ -793,6 +823,7 @@ async function descargarReportePDF() {
     doc.text('Socios vencidos', 14, nextY);
 
     const vencidosBody = sociosVencidos.map((s) => [
+      s.documento || '-',
       s.nombre || '-',
       s.plan || '-',
       formatGs(s.monto_mensual || 0),
@@ -802,10 +833,10 @@ async function descargarReportePDF() {
 
     doc.autoTable({
       startY: nextY + 4,
-      head: [['Socio', 'Plan', 'Monto', 'Vencimiento', 'Teléfono']],
+      head: [['CI', 'Socio', 'Plan', 'Monto', 'Vencimiento', 'Teléfono']],
       body: vencidosBody.length
         ? vencidosBody
-        : [['No hay socios vencidos', '-', '-', '-', '-']],
+        : [['-', 'No hay socios vencidos', '-', '-', '-', '-']],
       theme: 'grid',
       headStyles: {
         fillColor: colores.rojoSuave,
@@ -828,7 +859,7 @@ async function descargarReportePDF() {
         lineWidth: 0.2,
       },
       columnStyles: {
-        2: { halign: 'right' },
+        3: { halign: 'right' },
       },
     });
 
@@ -946,6 +977,16 @@ function setupMenuLinks() {
         });
       }
     });
+  });
+}
+
+function setupBuscarSocio() {
+  const input = $$('buscarSocio');
+  if (!input) return;
+
+  input.addEventListener('input', (e) => {
+    state.filtroSocio = e.target.value || '';
+    renderSociosTable();
   });
 }
 
@@ -1114,6 +1155,7 @@ function setDefaults() {
 
 wireMoneyInputs();
 setDefaults();
+setupBuscarSocio();
 
 (async () => {
   if (initSupabase()) {

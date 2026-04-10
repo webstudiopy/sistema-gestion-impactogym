@@ -12,33 +12,33 @@
 </head>
 <body>
   <header class="mobile-topbar d-lg-none">
-  <button
-    class="btn btn-dark mobile-menu-btn"
-    type="button"
-    data-bs-toggle="offcanvas"
-    data-bs-target="#mobileMenu"
-    aria-controls="mobileMenu"
-  >
-    <i class="bi bi-list"></i>
-  </button>
+    <button
+      class="btn btn-dark mobile-menu-btn"
+      type="button"
+      data-bs-toggle="offcanvas"
+      data-bs-target="#mobileMenu"
+      aria-controls="mobileMenu"
+    >
+      <i class="bi bi-list"></i>
+    </button>
 
-  <div class="mobile-brand">
-    <img src="assets/logo2.png" alt="Logo Impacto GYM">
-    <div>
-      <h1 class="mobile-brand-title mb-0">Impacto GYM</h1>
-      <p class="mobile-brand-subtitle mb-0">Cobros de gimnasio</p>
+    <div class="mobile-brand">
+      <img src="assets/logo2.png" alt="Logo Impacto GYM">
+      <div>
+        <h1 class="mobile-brand-title mb-0">Impacto GYM</h1>
+        <p class="mobile-brand-subtitle mb-0">Cobros de gimnasio</p>
+      </div>
     </div>
-  </div>
 
-  <div class="d-flex align-items-center gap-2">
-    <button class="btn btn-dark btn-sm" id="btnDescargarPDFMobile" type="button" title="Descargar PDF">
-      <i class="bi bi-file-earmark-pdf"></i>
-    </button>
-    <button class="btn btn-outline-secondary btn-sm" id="btnThemeMobile" type="button" title="Cambiar tema">
-      <i class="bi bi-moon-stars"></i>
-    </button>
-  </div>
-</header>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-dark btn-sm" id="btnDescargarPDFMobile" type="button" title="Descargar PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" id="btnThemeMobile" type="button" title="Cambiar tema">
+        <i class="bi bi-moon-stars"></i>
+      </button>
+    </div>
+  </header>
 
   <div class="offcanvas offcanvas-start mobile-offcanvas" tabindex="-1" id="mobileMenu" aria-labelledby="mobileMenuLabel">
     <div class="offcanvas-header">
@@ -180,6 +180,18 @@
         </div>
 
         <div class="col-12 col-md-6 col-xl-3">
+          <div class="stat-card">
+            <div class="stat-icon bg-info-subtle text-info">
+              <i class="bi bi-calendar-check-fill"></i>
+            </div>
+            <div>
+              <div class="stat-label">Pagos hoy</div>
+              <div class="stat-value" id="statPagosHoy">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-3">
           <button
             type="button"
             class="stat-card stat-card-button w-100 text-start"
@@ -215,7 +227,7 @@
               </div>
 
               <div class="col-12 col-md-6">
-                <label class="form-label">Documento</label>
+                <label class="form-label">C.I</label>
                 <input type="text" class="form-control" id="socioDocumento">
               </div>
 
@@ -338,10 +350,26 @@
       <section class="row g-4 mt-1">
         <div class="col-12 col-xl-6">
           <div class="glass-card h-100">
-            <div class="section-head">
+            <div class="section-head d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
               <div>
                 <h4 class="section-title">Socios y vencimientos</h4>
                 <p class="section-text mb-0">Se muestra en rojo cuando el pago ya está vencido.</p>
+              </div>
+
+              <div class="w-100" style="max-width: 360px;">
+                <label for="buscarSocio" class="form-label mb-1">Buscar socio por nombre o CI</label>
+                <div class="input-group">
+                  <span class="input-group-text">
+                    <i class="bi bi-search"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="buscarSocio"
+                    placeholder="Escribí nombre o CI"
+                    autocomplete="off"
+                  >
+                </div>
               </div>
             </div>
 
@@ -349,6 +377,7 @@
               <table class="table table-modern align-middle" id="tablaSocios">
                 <thead>
                   <tr>
+                    <th>CI</th>
                     <th>Socio</th>
                     <th>Plan</th>
                     <th class="text-end">Monto</th>
@@ -434,6 +463,7 @@
             <table class="table table-modern align-middle mb-0" id="tablaSociosVencidos">
               <thead>
                 <tr>
+                  <th>CI</th>
                   <th>Socio</th>
                   <th>Plan</th>
                   <th class="text-end">Monto</th>
@@ -444,7 +474,7 @@
               </thead>
               <tbody id="tbodySociosVencidos">
                 <tr>
-                  <td colspan="6" class="text-center text-secondary py-4">No hay socios vencidos.</td>
+                  <td colspan="7" class="text-center text-secondary py-4">No hay socios vencidos.</td>
                 </tr>
               </tbody>
             </table>
@@ -459,7 +489,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="js/app.js"></script>
